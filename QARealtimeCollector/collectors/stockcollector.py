@@ -1,18 +1,25 @@
-from QUANTAXIS.QAFetch.QATdx_adv import QA_Tdx_Executor
-from QUANTAXIS.QAEngine.QAThreadEngine import QA_Thread
-from QUANTAXIS.QAARP.QAUser import QA_User
+import json
 import threading
+import datetime
+
 from QAPUBSUB.consumer import subscriber_routing
-from QAPUBSUB.producer import publisher_routing
+from QAPUBSUB.producer import publisher, publisher_routing
+from QARealtimeCollector.setting import eventmq_ip
+from QUANTAXIS.QAARP.QAUser import QA_User
+from QUANTAXIS.QAEngine.QAThreadEngine import QA_Thread
+from QUANTAXIS.QAFetch.QATdx_adv import QA_Tdx_Executor
+from QUANTAXIS.QAUtil.QATransform import QA_util_to_json_from_pandas
 
 
 class QARTC_Stock(QA_Tdx_Executor):
-    def __init__(self, username, password):
+    def __init__(self):
         super().__init__(name='QAREALTIME_COLLECTOR_STOCK')
-        self.user = QA_User(username=username, password=password)
-        self.sub = subscriber_routing(
-            exchange='QARealtime_Market', routing_key='stock')
+        self.codelist = []
+        self.sub = subscriber_routing(host=eventmq_ip,
+                                      exchange='QARealtime_Market', routing_key='stock')
         self.sub.callback = self.callback
+        self.pub = publisher(
+            host=eventmq_ip, exchange='stocktransaction')
         threading.Thread(target=self.sub.start, daemon=True).start()
 
     def subscribe(self, code):
@@ -21,10 +28,11 @@ class QARTC_Stock(QA_Tdx_Executor):
         Arguments:
             code {[type]} -- [description]
         """
-        self.user.sub_code(code)
+        if code not in self.codelist:
+            self.codelist.append(code)
 
     def unsubscribe(self, code):
-        self.user.unsub_code(code)
+        self.codelist.remove(code)
 
     def callback(self, a, b, c, data):
         data = json.loads(data)
@@ -35,9 +43,9 @@ class QARTC_Stock(QA_Tdx_Executor):
             import copy
             if isinstance(new_ins, list):
                 for item in new_ins:
-                    self.user.sub_code(item)
+                    self.subscribe(item)
             else:
-                self.user.sub_code(new_ins)
+                self.subscribe(new_ins)
         if data['topic'] == 'unsubscribe':
             print('receive new unsubscribe: {}'.format(data['code']))
             new_ins = data['code'].replace('_', '.').split(',')
@@ -45,23 +53,25 @@ class QARTC_Stock(QA_Tdx_Executor):
             import copy
             if isinstance(new_ins, list):
                 for item in new_ins:
-                    self.user.unsub_code(item)
+                    self.unsubscribe(item)
             else:
-                self.user.unsub_code(new_ins)
+                self.unsubscribe(new_ins)
 
     def get_data(self):
-        data = self.get_realtime_concurrent(self.user.subscribed_code)
-        print(data)
+        data, time = self.get_realtime_concurrent(self.codelist)
+        data = QA_util_to_json_from_pandas(data.reset_index())
+        self.pub.pub(json.dumps(data))
 
     def run(self):
         while 1:
             self.get_data()
             import time
+            print(datetime.datetime.now())
             time.sleep(1)
 
 
 if __name__ == "__main__":
-    r = QARTC_Stock('yutiansut', '940809')
+    r = QARTC_Stock()
     r.subscribe('000001')
     r.subscribe('000002')
     r.start()

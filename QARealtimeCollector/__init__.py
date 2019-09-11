@@ -1,16 +1,27 @@
-__version__ = '0.0.3'
+__version__ = '0.0.8'
 __author__ = 'yutiansut'
 
-from QARealtimeCollector.collectors import QARTC_WsCollector, QARTC_Stock, QARTC_CtpBeeCollector, QARTC_RandomTick
-from QARealtimeCollector.clients import QARTC_Clients
-from QARealtimeCollector.datahandler import QARTC_Resampler
 import click
+
+from QARealtimeCollector.clients import QARTC_Clients
+from QARealtimeCollector.collectors import (QARTC_CtpBeeCollector,
+                                            QARTC_CTPTickCollector,
+                                            QARTC_RandomTick, QARTC_Stock,
+                                            QARTC_WsCollector)
+from QARealtimeCollector.datahandler import QARTC_Resampler
 
 
 @click.command()
 @click.option('--code', default='rb1910')
 def start(code):
     r = QARTC_CtpBeeCollector(code)
+    r.start()
+
+
+@click.command()
+@click.option('--code', default='rb1910')
+def start_ctp(code):
+    r = QARTC_CTPTickCollector(code)
     r.start()
 
 
@@ -31,3 +42,7 @@ def resample(code, freq, model):
 def random(code, date, price, interval):
     r = QARTC_RandomTick(code, date, price, interval)
     r.start()
+
+
+def stock_collector():
+    QARTC_Stock().start()

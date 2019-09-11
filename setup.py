@@ -63,12 +63,16 @@ setup(
         'Intended Audience :: Developers',
         'Operating System :: OS Independent',
     ],
-    install_requires=['quantaxis', 'quantaxis_pubsub'],
+    install_requires=['quantaxis', 'quantaxis_pubsub',
+                      'quantaxis-otgbroker', 'quantaxis-randomprice','quantaxis_webserver'],
     entry_points={
         'console_scripts': [
             'QARC_Start = QARealtimeCollector.__init__:start',
             'QARC_Resample = QARealtimeCollector.__init__:resample',
-            'QARC_Random = QARealtimeCollector.__init__:random'
+            'QARC_Random = QARealtimeCollector.__init__:random',
+            'QARC_CTP = QARealtimeCollector.__init__:start_ctp',
+            'QARC_Stock = QARealtimeCollector.__init__:stock_collector',
+            'QARC_WEBSERVER = QARealtimeCollector.webserver:main'
         ]
     },
     # install_requires=requirements,
