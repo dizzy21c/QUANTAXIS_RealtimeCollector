@@ -72,6 +72,7 @@ setup(
             'QARC_Random = QARealtimeCollector.__init__:random',
             'QARC_CTP = QARealtimeCollector.__init__:start_ctp',
             'QARC_Stock = QARealtimeCollector.__init__:stock_collector',
+            'QARC_Stock2 = QARealtimeCollector.__init__:stock_collector_ext',
             'QARC_WEBSERVER = QARealtimeCollector.webserver:main'
         ]
     },

@@ -1,4 +1,4 @@
-__version__ = '0.0.8'
+__version__ = '0.0.9'
 __author__ = 'yutiansut'
 
 import click
@@ -6,7 +6,7 @@ import click
 from QARealtimeCollector.clients import QARTC_Clients
 from QARealtimeCollector.collectors import (QARTC_CtpBeeCollector,
                                             QARTC_CTPTickCollector,
-                                            QARTC_RandomTick, QARTC_Stock,
+                                            QARTC_RandomTick, QARTC_Stock, QARTC_Stock_Ext,
                                             QARTC_WsCollector)
 from QARealtimeCollector.datahandler import QARTC_Resampler
 
@@ -46,3 +46,11 @@ def random(code, date, price, interval):
 
 def stock_collector():
     QARTC_Stock().start()
+
+@click.command()
+@click.option('--code_list', default='')
+@click.option('--block_name', default=None)
+@click.option('--block_id', default='0')
+@click.option('--freq', default='0')
+def stock_collector_ext(code_list, block_id, block_name, freq):
+    QARTC_Stock_Ext(code_list, block_id, block_name, freq).start()
