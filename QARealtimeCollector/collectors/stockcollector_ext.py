@@ -3,6 +3,7 @@ import threading
 import datetime
 
 from QUANTAXIS import QA_fetch_stock_block_adv
+from QUANTAXIS import QA_fetch_get_stock_list 
 from QAPUBSUB.consumer import subscriber_routing
 from QAPUBSUB.producer import publisher, publisher_routing
 from QARealtimeCollector.setting import eventmq_ip
@@ -13,30 +14,33 @@ from QUANTAXIS.QAUtil.QATransform import QA_util_to_json_from_pandas
 
 
 class QARTC_Stock_Ext(QA_Tdx_Executor):
-    def __init__(self, code_list, block_id = '0', block_name = None, freq = '0'):
+    def __init__(self, code_list = '', block_id = '0', block_name = None, freq = '0'):
         super().__init__(name='QAREALTIME_COLLECTOR_STOCK_EXT')
         self.codelist = code_list.split(',')
         # self.codelist = code_list
+        # 默认所有代码, 去除ST
         if self.codelist == ['']:
-            self.codelist = []
+            code_df = QA_fetch_get_stock_list('tdx')
+            code_s = code_df[~code_df.name.str.contains('ST')].code
+            self.codelist = code_s.tolist()[:10]
         if block_name is not None:
             self.codelist = QA_fetch_stock_block_adv(blockname= block_name).code
         
-        print(block_name)
-        print(self.codelist)
-        # print(self.codelist)
-        # self.codelist=['600718']
+        self.block_id = block_id
         self.freq = freq
         self.sub = subscriber_routing(host=eventmq_ip,
-                                      exchange='QARealtime_Market', routing_key='stock')
+                                      exchange='QARealtime_Market', routing_key=block_id)
         self.sub.callback = self.callback
         if freq == '0':
-            exchange_name = 'stock_rt_{}'.format(block_id)
+            exchange_name = 'realtime_stock_{}'.format(block_id)
         else:
-            exchange_name = 'stock_bar_{}_{}'.format(block_id, freq)
+            exchange_name = 'realtime_stock_{}_{}'.format(block_id, freq)
             
-        self.pub = publisher(
-            host=eventmq_ip, exchange=exchange_name)
+        # self.pub = publisher(
+        #     host=eventmq_ip, exchange=exchange_name)
+        # self.pub = publisher_routing(host=eventmq_ip, exchange=exchange_name)
+        self.pub = publisher_routing(host=eventmq_ip, exchange=exchange_name, routing_key=block_id)
+        
         threading.Thread(target=self.sub.start, daemon=True).start()
 
     def subscribe(self, code):
@@ -84,7 +88,7 @@ class QARTC_Stock_Ext(QA_Tdx_Executor):
             pass
             
         data = QA_util_to_json_from_pandas(data.reset_index())
-        self.pub.pub(json.dumps(data))
+        self.pub.pub(json.dumps(data), self.block_id)
 
     def run(self):
         while 1:
@@ -102,12 +106,12 @@ if __name__ == "__main__":
 
     r.subscribe('600010')
 
-    import json
-    import time
-    time.sleep(2)
-    publisher_routing(exchange='QARealtime_Market', routing_key='stock').pub(json.dumps({
-        'topic': 'subscribe',
-        'code': '600012'
-    }), routing_key='stock')
+    # import json
+    # import time
+    # time.sleep(2)
+    # publisher_routing(exchange='QARealtime_Market', routing_key='stock').pub(json.dumps({
+    #     'topic': 'subscribe',
+    #     'code': '600012'
+    # }), routing_key='stock')
 
-    r.unsubscribe('000001')
+    # r.unsubscribe('000001')
