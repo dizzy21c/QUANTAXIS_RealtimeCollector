@@ -82,8 +82,8 @@ class QARTC_Stock_Ext(QA_Tdx_Executor):
     def get_data(self):
         if self.freq == '0':
             data, time = self.get_realtime_concurrent(self.codelist)
-        # elif self.freq == '1':
-        #     data, time = self.get_realtime_concurrent(self.codelist)
+        elif self.freq == '1min':
+            data, time = self.get_realtime_concurrent(self.codelist)
         else:
             # data, time = self.get_realtime_concurrent(self.codelist)
             pass
@@ -99,24 +99,25 @@ class QARTC_Stock_Ext(QA_Tdx_Executor):
             time.sleep(1)
 
 @click.command()
-@click.option('--code-list', default='')
-@click.option('--block-name', default=None)
-@click.option('--block-id', default='0')
-@click.option('--freq', default='0')
-@click.option('--mode', default='')
+@click.option('--code-list', default='', help="000001,000002")
+@click.option('--block-name', default=None, help = "通达信版本名称，选取code用。覆盖code-list参数")
+@click.option('--block-id', default='0', help="bjbk，rabbitmq 订阅用")
+@click.option('--freq', default='0', help="0 1s实时  1min 1分钟")
+@click.option('--mode', default='def', help= "add-code 追加code模式， del-code 删除code模式, def： 订阅数据模式")
 def stock_collector_ext(code_list, block_id, block_name, freq, mode):
-    if mode == 'add-code':
-        pub = publisher_routing(host=eventmq_ip, exchange='QARealtime_Market', routing_key=block_id)
-        sendstr = '"topic":"subscribe","code":"{}"'.format(code_list)
-        sendstr = ''.join(['{', sendstr, '}'])
-        pub.pub(sendstr, routing_key= block_id)
-    elif mode == 'del-code':
-        pub = publisher_routing(host=eventmq_ip, exchange='QARealtime_Market', routing_key=block_id)
-        sendstr = '"topic":"unsubscribe","code":"{}"'.format(code_list)
-        sendstr = ''.join(['{', sendstr, '}'])
-        pub.pub(sendstr, routing_key= block_id)
-    else:
+    if mode == 'def':
         QARTC_Stock_Ext(code_list, block_id, block_name, freq).start()
+    else:
+        pub = publisher_routing(host=eventmq_ip, exchange='QARealtime_Market', routing_key=block_id)
+        if mode == 'add-code':
+            sendstr = '"topic":"subscribe","code":"{}"'.format(code_list)
+        elif mode == 'del-code':
+            sendstr = '"topic":"unsubscribe","code":"{}"'.format(code_list)
+        else:
+            sendstr = '"msg":"unkowned mode"'
+            print(sendstr)
+        sendstr = ''.join(['{', sendstr, '}'])
+        pub.pub(sendstr, routing_key= block_id)
     
 if __name__ == "__main__":
     stock_collector_ext()
