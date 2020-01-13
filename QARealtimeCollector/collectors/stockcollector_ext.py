@@ -12,6 +12,7 @@ from QUANTAXIS.QAEngine.QAThreadEngine import QA_Thread
 from QUANTAXIS.QAFetch.QATdx_adv import QA_Tdx_Executor
 from QUANTAXIS.QAUtil.QATransform import QA_util_to_json_from_pandas
 
+import click
 
 class QARTC_Stock_Ext(QA_Tdx_Executor):
     def __init__(self, code_list = '', block_id = '0', block_name = None, freq = '0'):
@@ -97,14 +98,34 @@ class QARTC_Stock_Ext(QA_Tdx_Executor):
             # print(datetime.datetime.now())
             time.sleep(1)
 
-
+@click.command()
+@click.option('--code-list', default='')
+@click.option('--block-name', default=None)
+@click.option('--block-id', default='0')
+@click.option('--freq', default='0')
+@click.option('--mode', default='')
+def stock_collector_ext(code_list, block_id, block_name, freq, mode):
+    if mode == 'add-code':
+        pub = publisher_routing(host=eventmq_ip, exchange='QARealtime_Market', routing_key=block_id)
+        sendstr = '"topic":"subscribe","code":"{}"'.format(code_list)
+        sendstr = ''.join(['{', sendstr, '}'])
+        pub.pub(sendstr, routing_key= block_id)
+    elif mode == 'del-code':
+        pub = publisher_routing(host=eventmq_ip, exchange='QARealtime_Market', routing_key=block_id)
+        sendstr = '"topic":"unsubscribe","code":"{}"'.format(code_list)
+        sendstr = ''.join(['{', sendstr, '}'])
+        pub.pub(sendstr, routing_key= block_id)
+    else:
+        QARTC_Stock_Ext(code_list, block_id, block_name, freq).start()
+    
 if __name__ == "__main__":
-    r = QARTC_Stock_Ext()
-    r.subscribe('000001')
-    r.subscribe('000002')
-    r.start()
+    stock_collector_ext()
+    # r = QARTC_Stock_Ext()
+    # r.subscribe('000001')
+    # r.subscribe('000002')
+    # r.start()
 
-    r.subscribe('600010')
+    # r.subscribe('600010')
 
     # import json
     # import time
