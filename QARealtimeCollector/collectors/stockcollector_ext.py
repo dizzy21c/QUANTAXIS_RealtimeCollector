@@ -15,19 +15,19 @@ from QUANTAXIS.QAUtil.QATransform import QA_util_to_json_from_pandas
 import click
 
 class QARTC_Stock_Ext(QA_Tdx_Executor):
-    def __init__(self, code_list = '', block_id = '0', block_name = None, freq = 'day'):
+    def __init__(self, code_list = '', block_id = '0', block_name = None, freq = '0'):
         super().__init__(name='QAREALTIME_COLLECTOR_STOCK_EXT')
         self.codelist = code_list.split(',')
-        self.pub_dict = {}
+        # self.pub_dict = {}
         # self.codelist = code_list
-        # 默认所有代码, 去除ST
-        if self.codelist == ['']:
-            code_df = QA_fetch_get_stock_list('tdx')
-            code_s = code_df[~code_df.name.str.contains('ST')].code
-            self.codelist = code_s.tolist()[:10]
+        self.load_data = False
         if block_name is not None:
             self.codelist = QA_fetch_stock_block_adv(blockname= block_name).code
-        
+        if self.codelist == ['']:
+            # 默认所有代码, 去除ST
+            code_df = QA_fetch_get_stock_list('tdx')
+            code_s = code_df[~code_df.name.str.contains('ST')].code
+            self.codelist = code_s.tolist()[:4]
         self.block_id = block_id
         self.freq = freq
         self.sub = subscriber_routing(host=eventmq_ip,
@@ -41,9 +41,9 @@ class QARTC_Stock_Ext(QA_Tdx_Executor):
         # self.pub = publisher(
         #     host=eventmq_ip, exchange=exchange_name)
         # self.pub = publisher_routing(host=eventmq_ip, exchange=exchange_name)
-        self.pub = publisher_routing(host=eventmq_ip, exchange=self.exchange_name, routing_key='')
-        for code in self.codelist:
-           self.pub_dict[code] = publisher_routing(host=eventmq_ip, exchange=self.exchange_name, routing_key=code)
+        self.pub = publisher_routing(host=eventmq_ip, exchange=self.exchange_name, routing_key=self.block_id)
+        # for code in self.codelist:
+        #    self.pub_dict[code] = publisher_routing(host=eventmq_ip, exchange=self.exchange_name, routing_key=code)
         
         threading.Thread(target=self.sub.start, daemon=True).start()
 
@@ -55,7 +55,7 @@ class QARTC_Stock_Ext(QA_Tdx_Executor):
         """
         if code not in self.codelist:
             self.codelist.append(code)
-            self.pub_dict[code] = publisher_routing(host=eventmq_ip, exchange=self.exchange_name, routing_key=code)
+            # self.pub_dict[code] = publisher_routing(host=eventmq_ip, exchange=self.exchange_name, routing_key=code)
 
     def unsubscribe(self, code):
         self.codelist.remove(code)
@@ -85,8 +85,12 @@ class QARTC_Stock_Ext(QA_Tdx_Executor):
                 self.unsubscribe(new_ins)
 
     def get_data(self):
+        print("get_data:%s" % datetime.datetime.now())
+        self.load_data = True
         if self.freq == '0':
             data, time = self.get_realtime_concurrent(self.codelist)
+            # print(data.columns)
+            # print(time)
         elif self.freq == '1min':
             data, time = self.get_realtime_concurrent(self.codelist)
         else:
@@ -95,19 +99,23 @@ class QARTC_Stock_Ext(QA_Tdx_Executor):
             
         data = QA_util_to_json_from_pandas(data.reset_index())
         self.pub.pub(json.dumps(data), self.block_id)
+        self.load_data = False
 
     def run(self):
         while 1:
-            self.get_data()
+            if not self.load_data:
+                self.get_data()
+            else:
+                print("get_data-skip:%s" % datetime.datetime.now())
             import time
             # print(datetime.datetime.now())
-            time.sleep(1)
+            time.sleep(10)
 
 @click.command()
 @click.option('--code-list', default='', help="000001,000002")
 @click.option('--block-name', default=None, help = "通达信版本名称，选取code用。覆盖code-list参数")
-@click.option('--block-id', default='day', help="bjbk，rabbitmq 订阅用")
-@click.option('--freq', default='day', help="0 1s实时  1min 1分钟")
+@click.option('--block-id', default='0', help="bjbk，rabbitmq 订阅用")
+@click.option('--freq', default='0', help="0 1s实时  1min 1分钟")
 @click.option('--mode', default='def', help= "add-code 追加code模式， del-code 删除code模式, def： 订阅数据模式")
 def stock_collector_ext(code_list, block_id, block_name, freq, mode):
     if mode == 'def':
